@@ -1,12 +1,11 @@
-import sys
-import os
-import re
-import fnmatch
+import sys, os, fnmatch
+import re, ast
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import pyqtSlot, Qt
-from PyQt5.QtGui import QStandardItem
+from PyQt5.QtGui import QStandardItem, QTextDocument, QFont
 
 from DockerClient import DockerClient, DockerThread_BuildImage
+from UIDockerfileEditor import DockerSyntaxHighlighter
 
 class UIDockerBuilder(QtWidgets.QWidget):
     def __init__(self):
@@ -136,8 +135,9 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.lblDockerfile = QtWidgets.QLabel(self.mainContent)
         self.lblDockerfile.setObjectName("lblDockerfile")
         self.vlayout_content.addWidget(self.lblDockerfile)
-        self.txtDockerfile = QtWidgets.QTextEdit(self.mainContent)
+        self.txtDockerfile = QtWidgets.QPlainTextEdit(self.mainContent)
         self.txtDockerfile.setObjectName("txtDockerfile")
+        #self.txtDockerfile.setLineWrapMode(QtWidgets.QTextEdit.NoWrap)      ### text wrap
         self.vlayout_content.addWidget(self.txtDockerfile)
         self.pbrBuildPrgoress = QtWidgets.QProgressBar(self.mainContent)
         self.pbrBuildPrgoress.setProperty("value", 24)
@@ -219,7 +219,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
 
         self.setLayout(self.vlayoutBase)
         self.layout().setContentsMargins(0,0,0,0)
-        self.setMinimumSize(800, 700)
+        self.setMinimumSize(900, 700)
 
         # initialize UI components
         self.retranslateUi(self)
@@ -229,6 +229,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.model_package.setHorizontalHeaderLabels(headerNames)
         self.package_list_proxy = QtCore.QSortFilterProxyModel(self)
         self.package_list_proxy.setSourceModel(self.model_package)
+        self.defaultFont = "Helvetica Neue" if sys.platform == "darwin" else "Courier"
 
         # events
         self.btnSelectScriptFile.clicked.connect(self.OnChooseScriptFile)
@@ -304,12 +305,37 @@ class UIDockerBuilder(QtWidgets.QWidget):
 
     def OnBaseImageSelectChanged(self, index):
         dockerfile = self.cboBaseImage.itemData(index)
-        if dockerfile == "-SCRATCH-":
-            self.txtDockerfile.clear()
+        self.txtDockerfile.setDocument(self.documentFromDockerfile(dockerfile))
+
+
+    def documentFromDockerfile(self, filename):
+        doc = QTextDocument(self)
+        doc.setDocumentLayout(QtWidgets.QPlainTextDocumentLayout(doc))
+        if filename == "-SCRATCH-":
+            doc.setPlainText("")
         else:
-            self.txtDockerfile.clear()
-            with open(dockerfile, 'r') as f:
-                self.txtDockerfile.append(f.read())
+            with open(filename, 'r') as f:
+                doc.setPlainText(f.read())
+        doc.setDefaultFont(QFont(self.defaultFont))
+        doc.highlighter = DockerSyntaxHighlighter(doc)
+        #doc.modificationChanged[bool].connect(self.onModificationChanged)
+        doc.setModified(False)
+        self._cachedDocument = doc
+
+        # parser bioc package list from docker file
+        # self.SelectedBiocPackage = []
+        # rawText = doc.toPlainText()
+        # self.model_package.clear()
+        #
+        # if rawText.find("biocLite(") >= 0:
+        #     packages = rawText.split("biocLite(")[1].split("\n")[0].split(")")[0]
+        #     if packages.find("c(") >= 0:
+        #         packages = packages.split("c(")[1]
+        #
+        #     l = ast.literal_eval(packages)
+        #     self.SelectedBiocPackage = [i.strip() for i in l]
+        #     #print (self.SelectedBiocPackage)
+        return self._cachedDocument
 
     @pyqtSlot()
     def OnGetPakageListClicked(self):
@@ -319,6 +345,8 @@ class UIDockerBuilder(QtWidgets.QWidget):
         for pkg in packageList:
             itemName = QStandardItem(pkg['Name'])
             itemName.setCheckable(True)
+            #if itemName in self.SelectedBiocPackage:
+            #    itemName.setCheckState(Qt.Checked)
             itemTitle = QStandardItem(pkg['Title'])
             self.model_package.appendRow([itemName, itemTitle])
 
@@ -326,20 +354,71 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.lstPackages.setModel(self.package_list_proxy)
         self.lstPackages.resizeColumnsToContents()
 
+
     @pyqtSlot(str)
     def OnPackageNameChanged(self, text):
         search = QtCore.QRegExp(text,QtCore.Qt.CaseInsensitive,QtCore.QRegExp.RegExp)
         self.package_list_proxy.setFilterRegExp(search)
 
+    def _move_editor_cursor(self, start, end):
+        cursor = self.txtDockerfile.textCursor()
+        cursor.setPosition(start)
+        cursor.movePosition(QtGui.QTextCursor.Right, QtGui.QTextCursor.KeepAnchor, end - start)
+        self.txtDockerfile.setTextCursor(cursor)
+
+    def _find_bioclite(self, query, text):
+        pattern = re.compile(query)
+        return pattern.search(text, 0) if query != "" else None
+
+    def _update_bioc_package_in_dockerfile(self, previous_package):
+        base_bioclite = "RUN Rscript -e \"source('https://bioconductor.org/biocLite.R');biocLite(c({0}),ask=FALSE)\"\n"
+        previous = ','.join("'{0}'".format(w) for w in previous_package)
+        current = ','.join("'{0}'".format(w) for w in self.SelectedBiocPackage)
+
+        # no package selected, delete
+        delete_mode = previous_package and not self.SelectedBiocPackage
+        if delete_mode: current = ''
+
+        plainText = self.txtDockerfile.toPlainText()
+
+        matched = self._find_bioclite(previous, plainText)
+
+        if matched:
+            self._move_editor_cursor(matched.start(), matched.end())
+            if delete_mode:
+                cursor = self.txtDockerfile.textCursor()
+                cursor.movePosition(QtGui.QTextCursor.StartOfBlock)
+                cursor.movePosition(QtGui.QTextCursor.EndOfBlock, QtGui.QTextCursor.KeepAnchor)
+                self.txtDockerfile.setTextCursor(cursor)
+        else:
+            # try locate "CMD"
+            matched_cmd = self._find_bioclite("CMD", plainText)
+            if matched_cmd:
+                self._move_editor_cursor(matched_cmd.start(), matched_cmd.end())
+                cursor = self.txtDockerfile.textCursor()
+                cursor.movePosition(QtGui.QTextCursor.StartOfBlock)
+                self.txtDockerfile.setTextCursor(cursor)
+            else:
+                self.txtDockerfile.moveCursor(QtGui.QTextCursor.End)
+
+        cursor = self.txtDockerfile.textCursor()
+        if matched and cursor.hasSelection():
+            cursor.insertText(current)
+        else:
+            cursor.insertText(base_bioclite.format(current))
+        self.txtDockerfile.setTextCursor(cursor)
+
+
     def OnPackageListSelectedChanged(self, item):
         package_name = item.text()
-        if not item.checkState():
-            if package_name in self.SelectedBiocPackage:
-                self.SelectedBiocPackage.remove(package_name)
-            print (self.SelectedBiocPackage)
-        else:
-            self.SelectedBiocPackage.append(package_name)
-            print(self.SelectedBiocPackage)
+        previous_package = self.SelectedBiocPackage.copy()
+        if not item.checkState():self.SelectedBiocPackage.remove(package_name)
+        else: self.SelectedBiocPackage.append(package_name)
+
+        self._update_bioc_package_in_dockerfile(previous_package)
+
+
+
 
     @pyqtSlot()
     def OnBuildClicked(self):
