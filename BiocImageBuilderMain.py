@@ -12,16 +12,12 @@ class UIDockerBuilder(QtWidgets.QWidget):
         super().__init__()
         # GUI
         # stylesheet
-        self.setStyleSheet("QPushButton{"
-                             "    background-color: #1588c5;"
-                             "    color: white;"
-                             "    height: 25px;"
-                             "    border: 1px solid #1a8ac6;"
-                             "    border-radius: 2px;}"
-                             "QPushButton:pressed {"
-                             "    background-color: #0077cc;"
-                             "    border-style: inset;"
-                             "}"
+        self.setStyleSheet(
+            "QPushButton{background-color: #1588c5; color: white; height: 25px; border: 1px solid #1a8ac6; border-radius: 2px;}"
+            "QPushButton:pressed { background-color: #158805; border-style: inset;}"
+            "QPushButton:disabled{ background-color: gray; }"
+            #"QPushButton:flat {border: none;}"
+            "QPushButton:hover{background-color: #1588f5; }"
                            #"QComboBox{"
                            #"      border: 1px solid gray; border-radius: 3px; padding: 1px 1px 1px 3px;"
                            #"      min-width: 6em;"
@@ -235,6 +231,8 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.btnSelectScriptFile.clicked.connect(self.OnChooseScriptFile)
         self.btnBuild.clicked.connect(self.OnBuildClicked)
         self.btnGetPackageList.clicked.connect(self.OnGetPakageListClicked)
+        self.btnOpen.clicked.connect(self.OnLoadDockerfile)
+        self.btnSave.clicked.connect(self.OnSaveDockerfile)
         self.cboBaseImage.currentIndexChanged.connect(self.OnBaseImageSelectChanged)
         self.edtPackageName.textChanged.connect(self.OnPackageNameChanged)
         self.model_package.itemChanged.connect(self.OnPackageListSelectedChanged)
@@ -305,7 +303,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
 
     def OnBaseImageSelectChanged(self, index):
         dockerfile = self.cboBaseImage.itemData(index)
-        self.txtDockerfile.setDocument(self.documentFromDockerfile(dockerfile))
+        self.documentFromDockerfile(dockerfile)
 
 
     def documentFromDockerfile(self, filename):
@@ -321,7 +319,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         #doc.modificationChanged[bool].connect(self.onModificationChanged)
         doc.setModified(False)
         self._cachedDocument = doc
-
+        self.txtDockerfile.setDocument(doc)
         # parser bioc package list from docker file
         # self.SelectedBiocPackage = []
         # rawText = doc.toPlainText()
@@ -417,6 +415,36 @@ class UIDockerBuilder(QtWidgets.QWidget):
 
         self._update_bioc_package_in_dockerfile(previous_package)
 
+    def OnSaveDockerfile(self):
+        filename = self.cboBaseImage.currentData()
+        if filename == "-SCRATCH-":
+            filename = os.path.expanduser("~/")
+
+        filename, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, 'Save Dockerfile',
+            filename,
+            'Docker files (*.*)'
+        )
+
+        if filename:
+            f = open(filename, 'w')
+            f.write(self.txtDockerfile.toPlainText())
+            f.close()
+
+    def OnLoadDockerfile(self):
+        filename, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, 'Open Dockerfile',
+            os.path.expanduser("~/"),
+            'Docker files (*)'
+        )
+        if filename:
+            itemName = '... ' + os.path.join(os.path.basename(os.path.dirname(filename)), os.path.basename(filename))
+            index = self.cboBaseImage.findData(filename)
+            if index >= 0:
+                self.cboBaseImage.setCurrentIndex(index)
+            else:
+                self.cboBaseImage.addItem(itemName, filename)
+                self.cboBaseImage.setCurrentIndex(self.cboBaseImage.findData(filename))
 
 
 
@@ -427,36 +455,31 @@ class UIDockerBuilder(QtWidgets.QWidget):
 FROM docker/whalesay:latest
 RUN apt-get -y update && apt-get install -y fortunes
 CMD /usr/games/fortune -a | cowsay'''
+        imagename = self.edtImageName.text()
+        if not imagename:
+            msg = QtWidgets.QMessageBox()
+            msg.setText('No Image Name')
+            msg.setInformativeText("No Image Name\n\nPlease specify a image name")
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.exec()
+            self.edtImageName.setFocus()
+            return
 
-        dockerfile = '''
-#xenial image
-FROM ubuntu:16.04
+        # verify image name
+        pattern = re.compile("^(?:(?=[^:\/]{1,253})(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(?:\.(?!-)[a-zA-Z0-9-]{1,63}(?<!-))*(?::[0-9]{1,5})?/)?((?![._-])(?:[a-z0-9._-]*)(?<![._-])(?:/(?![._-])[a-z0-9._-]*(?<![._-]))*)(?::(?![.-])[a-zA-Z0-9_.-]{1,128})?$")
+        if not pattern.search(imagename):
+            msg = QtWidgets.QMessageBox()
+            msg.setText('Image Name Invalid')
+            msg.setInformativeText("Typical image name:\n    registry/image-name[:version] \n\n"
+                        "For example: \n    biodepot/bwb:latest")
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.exec()
+            self.edtImageName.setFocus()
+            return
 
-#tools to manage repositories
-RUN apt-get update && apt-get install -y software-properties-common wget texinfo texlive texlive-fonts-extra
+        dockerfile = self.txtDockerfile.toPlainText()
 
-#To get R's blas and lapack must compile from source NOT from deb
-RUN wget https://cran.r-project.org/src/base/R-latest.tar.gz
-RUN tar -xzvf R-latest.tar.gz
-
-#install stuff for compilation of R
-
-RUN apt-get install -y build-essential gfortran xorg-dev gcc-multilib gobjc++ libblas-dev liblzma-dev gobjc++ libreadline-dev aptitude \
- libbz2-dev libpcre3-dev libcurl4-openssl-dev
-
-#configure and compile
-RUN cd R-* && ./configure
-RUN cd R-* && make -j 8
-RUN cd R-* && make prefix=/ install
-
-#need to install in xxx for libraries to be in the right place
-
-#install components of bioconductor for networkBMA
-RUN Rscript -e "source('https://bioconductor.org/biocLite.R');biocLite(c('stats','utils','BMA','Rcpp','RcppArmadillo','RcppEigen','BH','leaps','BiocParallel','Rgraphviz'),ask=FALSE)"
-
-CMD ["/bin/bash"]'''
-
-        imagename = self.edtImageName.text();
+        return
         self.txtOutput.append("Start building image [{0}]....".format(imagename))
         # Call docker API to build image using thread
         self.buildimage_thread = DockerThread_BuildImage(self.dockerClient, imagename, dockerfile)
