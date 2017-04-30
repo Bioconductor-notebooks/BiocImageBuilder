@@ -8,18 +8,26 @@
 - Docker engine >= 1.18.0
 
 ## Install requirements
-- PyQt5
+- PyQt5 
+```
   brew install pyqt5
-
+```
 - docker-py
+```
   pip3 install docker
-
+```
 ## How to run
 - Command line
+```
   python3 BiocImageBuilderMain.py
-
+```
 - macOs precompiled package
-  download docker-image-builder-app-macOS.zip from [Release](https://github.com/JMHOO/BiocImageBuilder/releases/tag/v0.1) tab
+
+  Download docker-image-builder-app-macOS.zip from [Release](https://github.com/JMHOO/BiocImageBuilder/releases/tag/v0.1) tab
+
 
   If you encountered 'Docker Credential' error during the building, please follow:
   [docker-credential-helpers](https://github.com/docker/docker-credential-helpers)
+
+## Embed your own Dockerfiles
+  Put your Dockerfiles into [DockerFiles] directory and rename your Dockerfile to **_<title>.Dockerfile_**
