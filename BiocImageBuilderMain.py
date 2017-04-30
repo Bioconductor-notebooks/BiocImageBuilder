@@ -10,6 +10,15 @@ from UIDockerfileEditor import DockerSyntaxHighlighter
 class UIDockerBuilder(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+
+        self.base_dir = os.path.dirname(os.path.abspath(__file__))
+        self.FLAG_in_bundle = False
+        if getattr(sys, 'frozen', False):
+            self.base_dir = sys._MEIPASS
+            self.FLAG_in_bundle =True
+
+        #print(self.base_dir)
+
         # GUI
         # stylesheet
         self.setStyleSheet(
@@ -30,6 +39,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.vlayoutBase.setContentsMargins(0, 0, 0, 0)
         self.vlayoutBase.setSpacing(0)
         self.vlayoutBase.setObjectName("vlayoutBase")
+        # Title area
         self.frameTitle = QtWidgets.QFrame(self)
         self.frameTitle.setMinimumSize(QtCore.QSize(0, 65))
         self.frameTitle.setMaximumSize(QtCore.QSize(16777215, 65))
@@ -40,8 +50,8 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.frameTitle.setFrameShape(QtWidgets.QFrame.Box)
         self.frameTitle.setFrameShadow(QtWidgets.QFrame.Plain)
         self.frameTitle.setObjectName("frameTitle")
-        self.lblFormTitle = QtWidgets.QLabel(self.frameTitle)
-        self.lblFormTitle.setGeometry(QtCore.QRect(66, 11, 300, 30))
+        self.lblFormTitle = QtWidgets.QLabel()
+        self.lblFormTitle.setFixedSize(QtCore.QSize(300,30))
         font = QtGui.QFont()
         font.setPointSize(18)
         font.setBold(False)
@@ -49,37 +59,61 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.lblFormTitle.setFont(font)
         self.lblFormTitle.setStyleSheet("color: white;")
         self.lblFormTitle.setObjectName("lblFormTitle")
-        self.lblIcon = QtWidgets.QLabel(self.frameTitle)
-        self.lblIcon.setGeometry(QtCore.QRect(14, 15, 41, 31))
+        self.lblIcon = QtWidgets.QLabel()
+        self.lblIcon.setFixedSize(QtCore.QSize(41, 31))
         self.lblIcon.setText("")
-        self.lblIcon.setPixmap(QtGui.QPixmap("icons/builder_icon.png"))
+        self.lblIcon.setPixmap(QtGui.QPixmap(os.path.join(self.base_dir,"icons/builder_icon.png")))
         self.lblIcon.setScaledContents(True)
         self.lblIcon.setObjectName("lblIcon")
-        self.lblDockerVersion = QtWidgets.QLabel(self.frameTitle)
-        self.lblDockerVersion.setGeometry(QtCore.QRect(71, 37, 300, 16))
+        self.lblDockerVersion = QtWidgets.QLabel()
+        self.lblDockerVersion.setFixedSize(QtCore.QSize(550, 16))
         font = QtGui.QFont()
         font.setPointSize(11)
         self.lblDockerVersion.setFont(font)
         self.lblDockerVersion.setStyleSheet("color: white;")
         self.lblDockerVersion.setObjectName("lblDockerVersion")
+        self.lblBuiding = QtWidgets.QLabel()
+        self.lblBuiding.setFixedSize(QtCore.QSize(550, 16))
+        self.lblBuiding.setFont(font)
+        self.lblBuiding.setStyleSheet("color: white;")
+        self.lblBuiding.setObjectName("lblBuilding")
+        self.lblBuiding.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        self.lblBuiding.setAlignment(Qt.AlignVCenter|Qt.AlignRight)
+        self.lblBuidingStep = QtWidgets.QLabel()
+        self.lblBuidingStep.setFixedSize(QtCore.QSize(300, 16))
+        self.lblBuidingStep.setFont(font)
+        self.lblBuidingStep.setStyleSheet("color: white;")
+        self.lblBuidingStep.setObjectName("lblBuidingStep")
+        self.lblBuidingStep.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
+        # grid layout for title area
+        self.glayout_title = QtWidgets.QGridLayout(self.frameTitle)
+        self.glayout_title.addWidget(self.lblIcon, 0, 0, 2, 0) # rowspan=2
+        self.glayout_title.addWidget(self.lblFormTitle, 0, 1, Qt.AlignLeft | Qt.AlignTop)
+        self.glayout_title.addWidget(self.lblBuidingStep, 0, 2, Qt.AlignRight | Qt.AlignTop)
+        self.glayout_title.addWidget(self.lblDockerVersion, 1, 1, Qt.AlignLeft | Qt.AlignBottom)
+        self.glayout_title.addWidget(self.lblBuiding, 1, 2, Qt.AlignRight | Qt.AlignBottom)
+        self.glayout_title.setColumnMinimumWidth(0, 41)
+        self.frameTitle.setLayout(self.glayout_title)
+
         self.vlayoutBase.addWidget(self.frameTitle)
         self.frameSubtitle = QtWidgets.QFrame(self)
         self.frameSubtitle.setEnabled(True)
-        self.frameSubtitle.setMinimumSize(QtCore.QSize(0, 45))
-        self.frameSubtitle.setMaximumSize(QtCore.QSize(16777215, 45))
+        self.frameSubtitle.setMinimumSize(QtCore.QSize(0, 35))
+        self.frameSubtitle.setMaximumSize(QtCore.QSize(16777215, 35))
         self.frameSubtitle.setStyleSheet("QFrame#frameSubtitle\n"
                                          "{background: #1998de; }")
         self.frameSubtitle.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.frameSubtitle.setFrameShadow(QtWidgets.QFrame.Plain)
         self.frameSubtitle.setObjectName("frameSubtitle")
         self.lblSubtitle = QtWidgets.QLabel(self.frameSubtitle)
-        self.lblSubtitle.setGeometry(QtCore.QRect(15, 7, 301, 30))
+        self.lblSubtitle.setGeometry(QtCore.QRect(15, 2, 301, 30))
         font = QtGui.QFont()
         font.setPointSize(14)
         self.lblSubtitle.setFont(font)
         self.lblSubtitle.setStyleSheet("color: white")
         self.lblSubtitle.setObjectName("lblSubtitle")
         self.vlayoutBase.addWidget(self.frameSubtitle)
+        # Left of main area
         self.mainContent = QtWidgets.QWidget(self)
         self.mainContent.setObjectName("mainContent")
         self.hlayout_mainArea = QtWidgets.QHBoxLayout(self.mainContent)
@@ -88,7 +122,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.hlayout_mainArea.setObjectName("hlayout_mainArea")
         self.vlayout_content = QtWidgets.QVBoxLayout()
         self.vlayout_content.setSizeConstraint(QtWidgets.QLayout.SetDefaultConstraint)
-        self.vlayout_content.setSpacing(2)
+        self.vlayout_content.setSpacing(5)
         self.vlayout_content.setContentsMargins(1, 1, 1, 1)
         self.vlayout_content.setObjectName("vlayout_content")
         self.lblName = QtWidgets.QLabel(self.mainContent)
@@ -121,6 +155,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.hlayout_RScript.setObjectName("horizontalLayout")
         self.edtRScript = QtWidgets.QLineEdit(self.mainContent)
         self.edtRScript.setObjectName("edtRScript")
+        self.edtRScript.setReadOnly(True)
         self.hlayout_RScript.addWidget(self.edtRScript)
         self.btnSelectScriptFile = QtWidgets.QPushButton(self.mainContent)
         self.btnSelectScriptFile.setMinimumSize(QtCore.QSize(24, 24))
@@ -136,30 +171,29 @@ class UIDockerBuilder(QtWidgets.QWidget):
         #self.txtDockerfile.setLineWrapMode(QtWidgets.QTextEdit.NoWrap)      ### text wrap
         self.vlayout_content.addWidget(self.txtDockerfile)
         self.pbrBuildPrgoress = QtWidgets.QProgressBar(self.mainContent)
-        self.pbrBuildPrgoress.setProperty("value", 24)
+        self.pbrBuildPrgoress.setProperty("value", 0)
+        self.pbrBuildPrgoress.setVisible(False)
         self.pbrBuildPrgoress.setObjectName("pbrBuildPrgoress")
         self.vlayout_content.addWidget(self.pbrBuildPrgoress)
+        # buttons area
         self.hlayout_buttons = QtWidgets.QHBoxLayout()
         self.hlayout_buttons.setObjectName("hlayout_buttons")
+        self.hlayout_buttons.setSpacing(5)
         self.btnOpen = QtWidgets.QPushButton(self.mainContent)
-        self.btnOpen.setMinimumSize(QtCore.QSize(75, 0))
-        self.btnOpen.setMaximumSize(QtCore.QSize(75, 16777215))
+        self.btnOpen.setFixedSize(QtCore.QSize(75, 30))
         self.btnOpen.setObjectName("btnOpen")
-        self.hlayout_buttons.addWidget(self.btnOpen)
         self.btnSave = QtWidgets.QPushButton(self.mainContent)
-        self.btnSave.setMinimumSize(QtCore.QSize(75, 0))
-        self.btnSave.setMaximumSize(QtCore.QSize(75, 16777215))
+        self.btnSave.setFixedSize(QtCore.QSize(75, 30))
         self.btnSave.setObjectName("btnSave")
-        self.hlayout_buttons.addWidget(self.btnSave)
-        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.hlayout_buttons.addItem(spacerItem)
         self.btnBuild = QtWidgets.QPushButton(self.mainContent)
-        self.btnBuild.setMinimumSize(QtCore.QSize(90, 0))
-        self.btnBuild.setMaximumSize(QtCore.QSize(90, 16777215))
+        self.btnBuild.setFixedSize(QtCore.QSize(90, 30))
         self.btnBuild.setObjectName("btnBuild")
+        self.hlayout_buttons.addWidget(self.btnOpen)
+        self.hlayout_buttons.addWidget(self.btnSave)
+        self.hlayout_buttons.addItem(QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum))
         self.hlayout_buttons.addWidget(self.btnBuild)
         self.vlayout_content.addLayout(self.hlayout_buttons)
-
+        # Right bioconductor packages aera
         self.vlayout_packages = QtWidgets.QVBoxLayout()
         self.vlayout_packages.setSpacing(3)
         self.vlayout_packages.setObjectName("vlayout_packages")
@@ -198,12 +232,11 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.lstPackages.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.lstPackages.verticalHeader().setVisible(False)
         self.vlayout_packages.addWidget(self.lstPackages)
-
+        # main window horizontal splitter
         container_mainLeft = QtWidgets.QWidget()
         container_mainRight = QtWidgets.QWidget()
         container_mainLeft.setLayout(self.vlayout_content)
         container_mainRight.setLayout(self.vlayout_packages)
-
         self.splitter_main = QtWidgets.QSplitter()
         self.splitter_main.addWidget(container_mainLeft)
         self.splitter_main.addWidget(container_mainRight)
@@ -227,7 +260,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.package_list_proxy.setSourceModel(self.model_package)
         self.defaultFont = "Helvetica Neue" if sys.platform == "darwin" else "Courier"
 
-        # events
+        # create UI events
         self.btnSelectScriptFile.clicked.connect(self.OnChooseScriptFile)
         self.btnBuild.clicked.connect(self.OnBuildClicked)
         self.btnGetPackageList.clicked.connect(self.OnGetPakageListClicked)
@@ -238,14 +271,12 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.model_package.itemChanged.connect(self.OnPackageListSelectedChanged)
 
         self.InitializeUI()
-        #self.test_log()
-
         self.show()
 
     def retranslateUi(self, Widget):
         _translate = QtCore.QCoreApplication.translate
         Widget.setWindowTitle(_translate("Widget", "Bioconductor Docker Image Builder"))
-        self.lblFormTitle.setText(_translate("Widget", " Bioconductor Docker Image Builder"))
+        self.lblFormTitle.setText(_translate("Widget", "Bioconductor Docker Image Builder"))
         self.lblSubtitle.setText(_translate("Widget", "Customize your own bioconductor image"))
         self.lblName.setText(_translate("Widget", "Image Name: "))
         self.lblBaseImage.setText(_translate("Widget", "Select base image:"))
@@ -254,6 +285,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.lblDockerfile.setText(_translate("Widget", "Builder detail: "))
         self.btnBuild.setText(_translate("Form", "Build"))
         self.lblDockerVersion.setText(_translate("Form", "Docker Engine: {0}"))
+        #self.lblBuiding.setText(_translate("Form", 'Ready'))
         self.lblDockerfile.setText(_translate("Form", "Docker file:"))
         self.btnOpen.setText(_translate("Form", "Open"))
         self.btnSave.setText(_translate("Form", "Save"))
@@ -275,6 +307,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
             e = sys.exc_info()[0]
             print (e)
             strDockerInfo = "No Docker Engine installed OR missing docker-py"
+            self.btnBuild.setEnabled(False)
 
         self.SelectedBiocPackage = []
         self.lblDockerVersion.setText(strDockerInfo)
@@ -282,13 +315,13 @@ class UIDockerBuilder(QtWidgets.QWidget):
 
         # scan docker files
         self.cboBaseImage.addItem("From scratch", "-SCRATCH-")
-        self.dockerfile_dir = os.path.join(os.path.split(os.path.realpath(sys.argv[0]))[0], 'DockerFiles')
+        self.dockerfile_dir = os.path.join(self.base_dir, 'DockerFiles')
         dockerfiles = [x for x in fnmatch.filter(os.listdir(self.dockerfile_dir), '*.Dockerfile')]
         for f in dockerfiles:
             filename, _ = os.path.splitext(os.path.basename(f))
             self.cboBaseImage.addItem(filename, os.path.join(self.dockerfile_dir, f))
 
-
+        self.building_log_file = os.path.join(self.base_dir, 'building.log')
 
 
     @pyqtSlot()
@@ -320,6 +353,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         doc.setModified(False)
         self._cachedDocument = doc
         self.txtDockerfile.setDocument(doc)
+
         # parser bioc package list from docker file
         # self.SelectedBiocPackage = []
         # rawText = doc.toPlainText()
@@ -446,15 +480,60 @@ class UIDockerBuilder(QtWidgets.QWidget):
                 self.cboBaseImage.addItem(itemName, filename)
                 self.cboBaseImage.setCurrentIndex(self.cboBaseImage.findData(filename))
 
+    def _set_building_text(self, labelCtrl, text):
+        metrics = QtGui.QFontMetrics(labelCtrl.font())
+        elidedText = metrics.elidedText(text, Qt.ElideRight, labelCtrl.width())
+        labelCtrl.setText(elidedText)
 
+    def _enableUIElements(self, enabled=False):
+        self.edtImageName.setEnabled(enabled)
+        self.btnSelectScriptFile.setEnabled(enabled)
+        self.txtDockerfile.setReadOnly(not enabled)
+        self.lstPackages.setEnabled(enabled)
+        self.edtPackageName.setEnabled(enabled)
+        self.btnOpen.setEnabled(enabled)
+        self.btnSave.setEnabled(enabled)
+        self.btnGetPackageList.setEnabled(enabled)
+        self.btnBuild.setEnabled(self.dockerInitialized and enabled)
+        self.cboBaseImage.setEnabled(enabled)
+
+    def _building_message_processor(self, message):
+        # write to log file
+        if not self.FLAG_in_bundle:
+            with open(self.building_log_file, 'a') as f:
+                f.write(message)
+
+        # eliminate blank lines
+        message = [s for s in message.splitlines() if s.strip()]
+        if not message:
+            return
+        #message = ''.join(message)
+        message = message[0]
+        self._set_building_text(self.lblBuiding, message)
+
+        endOfBuiding = False
+        # extract step progress
+        #   example: 'Step 10/10 : FROM ubuntu:16.04'
+        step_pattern = re.compile(r'Step \d+\/\d+')
+        if step_pattern.search(message):
+            progress = message.split(' : ')[0].split(' ')[1].split('/')
+            progress = [int(x) for x in progress]
+            if progress[0] == 1: self.pbrBuildPrgoress.setMaximum(progress[1])
+
+            self.pbrBuildPrgoress.setValue(progress[0])
+            self._set_building_text(self.lblBuidingStep, message)
+
+            endOfBuiding = progress[0] == progress[1]
+
+        successful = message.find("Successfully built") >= 0
+
+        if endOfBuiding or successful:
+            self._set_building_text(self.lblBuidingStep, '')
+            self._enableUIElements(True)
+            self.pbrBuildPrgoress.setVisible(False)
 
     @pyqtSlot()
     def OnBuildClicked(self):
-        dockerfile_example = '''
-#xenial image
-FROM docker/whalesay:latest
-RUN apt-get -y update && apt-get install -y fortunes
-CMD /usr/games/fortune -a | cowsay'''
         imagename = self.edtImageName.text()
         if not imagename:
             msg = QtWidgets.QMessageBox()
@@ -477,10 +556,11 @@ CMD /usr/games/fortune -a | cowsay'''
             self.edtImageName.setFocus()
             return
 
+        self._enableUIElements(False)
+        self.pbrBuildPrgoress.setVisible(True)
         dockerfile = self.txtDockerfile.toPlainText()
 
-        return
-        self.txtOutput.append("Start building image [{0}]....".format(imagename))
+        self._set_building_text(self.lblBuidingStep, "Start building")
         # Call docker API to build image using thread
         self.buildimage_thread = DockerThread_BuildImage(self.dockerClient, imagename, dockerfile)
         self.buildimage_thread.build_process.connect(self.ThreadEvent_OnImageBuilding)
@@ -489,6 +569,7 @@ CMD /usr/games/fortune -a | cowsay'''
 
 
     def ThreadEvent_OnImageBuilding(self, message):
+        # filter message, eliminate terminal colors
         ESC = r'\x1b'
         CSI = ESC + r'\['
         OSC = ESC + r'\]'
@@ -496,10 +577,13 @@ CMD /usr/games/fortune -a | cowsay'''
         ST = ESC + r'\\'
         BEL = r'\x07'
         pattern = '(' + CSI + '.*?' + CMD + '|' + OSC + '.*?' + '(' + ST + '|' + BEL + ')' + ')'
-        self.txtDockerfile.append(re.sub(pattern, '', message))
+        plainMessage = re.sub(pattern, '', message)
+        self._building_message_processor(plainMessage)
 
     def ThreadEvent_OnImageBuildComplete(self):
-        pass
+        self._set_building_text(self.lblBuidingStep, '')
+        self._enableUIElements(True)
+        self.pbrBuildPrgoress.setVisible(False)
 
 
 import requests, json

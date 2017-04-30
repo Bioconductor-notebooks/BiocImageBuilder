@@ -1,7 +1,7 @@
 import docker
 import requests, json
+import io
 from PyQt5.QtCore import QThread, pyqtSignal
-
 
 class DockerClient:
     def __init__(self, url, name):
@@ -93,7 +93,7 @@ class DockerClient:
         self.cli.remove_volume(name)
 
 class DockerThread_BuildImage(QThread):
-    build_process = pyqtSignal(['QString'])
+    build_process = pyqtSignal(str)
     build_complete = pyqtSignal(int)
     def __init__(self, cli, name, dockerfile):
         QThread.__init__(self)
@@ -107,7 +107,6 @@ class DockerThread_BuildImage(QThread):
     def run(self):
         imagename = self.name
         try:
-            import io
             f = io.BytesIO(self.dockerfile.encode('utf-8'))
             for rawline in self.docker.getClient().build(fileobj=f, tag=imagename, stream=True):
                 for jsonstr in rawline.decode('utf-8').split('\r\n')[:-1]:
@@ -120,12 +119,19 @@ class DockerThread_BuildImage(QThread):
                     except TypeError as e:
                         print (e)
                     except KeyError as e:
-                        log = line
+                        log = ', '.join("{!s}={!r}".format(key, val) for (key, val) in line.items())
+                    except:
+                        log = ''
+                    #print (log)
                     self.build_process.emit(log)
 
         except requests.exceptions.RequestException as e:
             self.build_process.emit(e.explanation)
-            print(e)
+            self.build_complete.emit(1)
+        except Exception as e:
+            self.build_process.emit(str(e))
+            self.build_complete.emit(1)
+            return
 
 class PullImageThread(QThread):
     pull_progress = pyqtSignal(int)
