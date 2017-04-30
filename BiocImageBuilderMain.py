@@ -1,10 +1,11 @@
 import sys, os, fnmatch
-import re, ast
+import re
+import requests, json
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import pyqtSlot, Qt
+from PyQt5.QtCore import pyqtSlot, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QStandardItem, QTextDocument, QFont
-
 from DockerClient import DockerClient, DockerThread_BuildImage
+
 from UIDockerfileEditor import DockerSyntaxHighlighter
 
 class UIDockerBuilder(QtWidgets.QWidget):
@@ -17,22 +18,32 @@ class UIDockerBuilder(QtWidgets.QWidget):
             self.base_dir = sys._MEIPASS
             self.FLAG_in_bundle =True
 
-        #print(self.base_dir)
-
-        # GUI
         # stylesheet
-        self.setStyleSheet(
-            "QPushButton{background-color: #1588c5; color: white; height: 25px; border: 1px solid #1a8ac6; border-radius: 2px;}"
-            "QPushButton:pressed { background-color: #158805; border-style: inset;}"
-            "QPushButton:disabled{ background-color: gray; }"
-            #"QPushButton:flat {border: none;}"
-            "QPushButton:hover{background-color: #1588f5; }"
-                           #"QComboBox{"
-                           #"      border: 1px solid gray; border-radius: 3px; padding: 1px 1px 1px 3px;"
-                           #"      min-width: 6em;"
-                           #"}"
-                           #"QSplitter::handle:horizontal { width: 2px; border: 1px solid green; border-radius: 1px; padding: 2px;}"
-                           )
+        css = '''
+            QPushButton {background-color: #1588c5; color: white; height: 25px; border: 1px solid #1a8ac6; border-radius: 2px;}
+            QPushButton:pressed { background-color: #158805; border-style: inset;}
+            QPushButton:disabled { background-color: lightGray; border: 1px solid gray; }
+            QPushButton:hover {background-color: #1588f5; }   
+            QFrame#frameTitle {background: #1588c5;color: #1588c5}
+            QFrame#frameSubtitle {background: #1998de; }
+            QFrame#framePackages{border: 1px solid #1588c5;border-radius: 2px;}
+            QLabel#lblInfoTitle{ 
+                background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 #1998de, stop:1 #1588c5);
+                padding-left: 3px;color: white;border-radius: 1px;
+            }
+        '''
+        # GUI
+        self.setStyleSheet(css)
+        fontTitle = QtGui.QFont()
+        fontTitle.setPointSize(18) if sys.platform == 'darwin' else fontTitle.setPointSize(12)
+        fontSubtitle = QtGui.QFont()
+        fontSubtitle.setPointSize(14) if sys.platform == 'darwin' else fontTitle.setPointSize(11)
+        fontSmallTitle = QtGui.QFont()
+        fontSmallTitle.setPointSize(11) if sys.platform == 'darwin' else fontSmallTitle.setPointSize(8)
+        self.fontDockerfileEditor = QtGui.QFont()
+        self.fontDockerfileEditor.setFamily("Helvetica Neue" if sys.platform == "darwin" else "Courier New")
+        self.fontDockerfileEditor.setPointSize(12) if sys.platform == 'darwin' else self.fontDockerfileEditor.setPointSize(10)
+
         # creat controls
         self.vlayoutBase = QtWidgets.QVBoxLayout()
         self.vlayoutBase.setSizeConstraint(QtWidgets.QLayout.SetDefaultConstraint)
@@ -43,20 +54,12 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.frameTitle = QtWidgets.QFrame(self)
         self.frameTitle.setMinimumSize(QtCore.QSize(0, 65))
         self.frameTitle.setMaximumSize(QtCore.QSize(16777215, 65))
-        self.frameTitle.setStyleSheet("QFrame#frameTitle{\n"
-                                      "    background: #1588c5;\n"
-                                      "    color: #1588c5\n"
-                                      "}")
         self.frameTitle.setFrameShape(QtWidgets.QFrame.Box)
         self.frameTitle.setFrameShadow(QtWidgets.QFrame.Plain)
         self.frameTitle.setObjectName("frameTitle")
         self.lblFormTitle = QtWidgets.QLabel()
         self.lblFormTitle.setFixedSize(QtCore.QSize(300,30))
-        font = QtGui.QFont()
-        font.setPointSize(18)
-        font.setBold(False)
-        font.setWeight(50)
-        self.lblFormTitle.setFont(font)
+        self.lblFormTitle.setFont(fontTitle)
         self.lblFormTitle.setStyleSheet("color: white;")
         self.lblFormTitle.setObjectName("lblFormTitle")
         self.lblIcon = QtWidgets.QLabel()
@@ -66,22 +69,20 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.lblIcon.setScaledContents(True)
         self.lblIcon.setObjectName("lblIcon")
         self.lblDockerVersion = QtWidgets.QLabel()
-        self.lblDockerVersion.setFixedSize(QtCore.QSize(550, 16))
-        font = QtGui.QFont()
-        font.setPointSize(11)
-        self.lblDockerVersion.setFont(font)
+        self.lblDockerVersion.setFixedSize(QtCore.QSize(220, 16))
+        self.lblDockerVersion.setFont(fontSmallTitle)
         self.lblDockerVersion.setStyleSheet("color: white;")
         self.lblDockerVersion.setObjectName("lblDockerVersion")
         self.lblBuiding = QtWidgets.QLabel()
-        self.lblBuiding.setFixedSize(QtCore.QSize(550, 16))
-        self.lblBuiding.setFont(font)
+        self.lblBuiding.setFixedSize(QtCore.QSize(500, 16))
+        self.lblBuiding.setFont(fontSmallTitle)
         self.lblBuiding.setStyleSheet("color: white;")
         self.lblBuiding.setObjectName("lblBuilding")
         self.lblBuiding.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
         self.lblBuiding.setAlignment(Qt.AlignVCenter|Qt.AlignRight)
         self.lblBuidingStep = QtWidgets.QLabel()
         self.lblBuidingStep.setFixedSize(QtCore.QSize(300, 16))
-        self.lblBuidingStep.setFont(font)
+        self.lblBuidingStep.setFont(fontSmallTitle)
         self.lblBuidingStep.setStyleSheet("color: white;")
         self.lblBuidingStep.setObjectName("lblBuidingStep")
         self.lblBuidingStep.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
@@ -94,22 +95,18 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.glayout_title.addWidget(self.lblBuiding, 1, 2, Qt.AlignRight | Qt.AlignBottom)
         self.glayout_title.setColumnMinimumWidth(0, 41)
         self.frameTitle.setLayout(self.glayout_title)
-
         self.vlayoutBase.addWidget(self.frameTitle)
+
         self.frameSubtitle = QtWidgets.QFrame(self)
         self.frameSubtitle.setEnabled(True)
         self.frameSubtitle.setMinimumSize(QtCore.QSize(0, 35))
         self.frameSubtitle.setMaximumSize(QtCore.QSize(16777215, 35))
-        self.frameSubtitle.setStyleSheet("QFrame#frameSubtitle\n"
-                                         "{background: #1998de; }")
         self.frameSubtitle.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.frameSubtitle.setFrameShadow(QtWidgets.QFrame.Plain)
         self.frameSubtitle.setObjectName("frameSubtitle")
         self.lblSubtitle = QtWidgets.QLabel(self.frameSubtitle)
-        self.lblSubtitle.setGeometry(QtCore.QRect(15, 2, 301, 30))
-        font = QtGui.QFont()
-        font.setPointSize(14)
-        self.lblSubtitle.setFont(font)
+        self.lblSubtitle.setGeometry(QtCore.QRect(15, 2, 400, 30))
+        self.lblSubtitle.setFont(fontSubtitle)
         self.lblSubtitle.setStyleSheet("color: white")
         self.lblSubtitle.setObjectName("lblSubtitle")
         self.vlayoutBase.addWidget(self.frameSubtitle)
@@ -117,7 +114,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.mainContent = QtWidgets.QWidget(self)
         self.mainContent.setObjectName("mainContent")
         self.hlayout_mainArea = QtWidgets.QHBoxLayout(self.mainContent)
-        self.hlayout_mainArea.setContentsMargins(8, 8, 8, 8)
+        self.hlayout_mainArea.setContentsMargins(8, 5, 8, 8)
         self.hlayout_mainArea.setSpacing(2)
         self.hlayout_mainArea.setObjectName("hlayout_mainArea")
         self.vlayout_content = QtWidgets.QVBoxLayout()
@@ -195,34 +192,23 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.vlayout_content.addLayout(self.hlayout_buttons)
         # Right bioconductor packages aera
         self.vlayout_packages = QtWidgets.QVBoxLayout()
-        self.vlayout_packages.setSpacing(3)
+        self.vlayout_packages.setSpacing(1)
         self.vlayout_packages.setObjectName("vlayout_packages")
-        self.vlayout_packages.setContentsMargins(1, 1, 1, 1)
-        self.linePackageHeader = QtWidgets.QFrame(self.mainContent)
-        self.linePackageHeader.setFrameShape(QtWidgets.QFrame.HLine)
-        self.linePackageHeader.setFrameShadow(QtWidgets.QFrame.Sunken)
-        self.linePackageHeader.setObjectName("linePackageHeader")
-        self.vlayout_packages.addWidget(self.linePackageHeader)
+        self.vlayout_packages.setContentsMargins(0, 0, 0, 0)
         self.lblInfoTitle = QtWidgets.QLabel(self.mainContent)
-        self.lblInfoTitle.setMinimumSize(QtCore.QSize(0, 25))
-        self.lblInfoTitle.setMaximumSize(QtCore.QSize(16777215, 25))
-        self.lblInfoTitle.setStyleSheet(
-            "background-color:qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 rgba(235, 235, 235, 255), stop:1 rgba(217, 217, 217, 255));\n"
-            "padding-left: 3px;")
+        self.lblInfoTitle.setMinimumSize(QtCore.QSize(0, 30))
+        self.lblInfoTitle.setMaximumSize(QtCore.QSize(16777215, 30))
         self.lblInfoTitle.setObjectName("lblInfoTitle")
         self.vlayout_packages.addWidget(self.lblInfoTitle)
         self.hlayout_list_search = QtWidgets.QHBoxLayout()
         self.hlayout_list_search.setObjectName("hlayout_list_search")
-        self.btnGetPackageList = QtWidgets.QPushButton(self.mainContent)
-        self.btnGetPackageList.setMinimumSize(QtCore.QSize(75, 0))
-        self.btnGetPackageList.setObjectName("btnGetPackageList")
-        self.hlayout_list_search.addWidget(self.btnGetPackageList)
-        self.lblSearchPackage = QtWidgets.QLabel(self.mainContent)
-        self.lblSearchPackage.setObjectName("lblSearchPackage")
-        self.hlayout_list_search.addWidget(self.lblSearchPackage)
+        self.hlayout_list_search.setContentsMargins(1, 0, 0, 1)
         self.edtPackageName = QtWidgets.QLineEdit(self.mainContent)
         self.edtPackageName.setClearButtonEnabled(True)
         self.edtPackageName.setObjectName("edtPackageName")
+        self.edtPackageName.setPlaceholderText("Search package")
+        self.edtPackageName.setMinimumSize(QtCore.QSize(0, 25))
+        self.edtPackageName.setMaximumSize(QtCore.QSize(16777215, 25))
         self.hlayout_list_search.addWidget(self.edtPackageName)
         self.vlayout_packages.addLayout(self.hlayout_list_search)
         self.lstPackages = QtWidgets.QTableView(self.mainContent)
@@ -231,10 +217,19 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.lstPackages.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
         self.lstPackages.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.lstPackages.verticalHeader().setVisible(False)
+        self.lstPackages.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.vlayout_packages.addWidget(self.lstPackages)
+
+        self.framePackages = QtWidgets.QFrame(self)
+        self.framePackages.setContentsMargins(0,0,0,0)
+        self.framePackages.setFrameShape(QtWidgets.QFrame.Box)
+        self.framePackages.setFrameShadow(QtWidgets.QFrame.Plain)
+        self.framePackages.setObjectName("framePackages")
+        #self.framePackages.setLayout(self.vlayout_packages)
+
         # main window horizontal splitter
         container_mainLeft = QtWidgets.QWidget()
-        container_mainRight = QtWidgets.QWidget()
+        container_mainRight = self.framePackages
         container_mainLeft.setLayout(self.vlayout_content)
         container_mainRight.setLayout(self.vlayout_packages)
         self.splitter_main = QtWidgets.QSplitter()
@@ -248,7 +243,15 @@ class UIDockerBuilder(QtWidgets.QWidget):
 
         self.setLayout(self.vlayoutBase)
         self.layout().setContentsMargins(0,0,0,0)
-        self.setMinimumSize(900, 700)
+
+        # set window size
+        width = 900
+        height = 700
+        if sys.platform != 'darwin':
+            dw = QtWidgets.QDesktopWidget()
+            if width > dw.width(): width = dw.width()*0.9
+            if height > dw.height(): height = dw.height()*0.9
+        self.setMinimumSize(width, height)
 
         # initialize UI components
         self.retranslateUi(self)
@@ -258,12 +261,11 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.model_package.setHorizontalHeaderLabels(headerNames)
         self.package_list_proxy = QtCore.QSortFilterProxyModel(self)
         self.package_list_proxy.setSourceModel(self.model_package)
-        self.defaultFont = "Helvetica Neue" if sys.platform == "darwin" else "Courier"
+
 
         # create UI events
         self.btnSelectScriptFile.clicked.connect(self.OnChooseScriptFile)
         self.btnBuild.clicked.connect(self.OnBuildClicked)
-        self.btnGetPackageList.clicked.connect(self.OnGetPakageListClicked)
         self.btnOpen.clicked.connect(self.OnLoadDockerfile)
         self.btnSave.clicked.connect(self.OnSaveDockerfile)
         self.cboBaseImage.currentIndexChanged.connect(self.OnBaseImageSelectChanged)
@@ -291,8 +293,6 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.btnSave.setText(_translate("Form", "Save"))
         self.btnBuild.setText(_translate("Form", "Build"))
         self.lblInfoTitle.setText(_translate("Form", "Bioconductor R packages"))
-        self.btnGetPackageList.setText(_translate("Form", "Get List"))
-        self.lblSearchPackage.setText(_translate("Form", "Search: "))
 
     def InitializeUI(self):
         # Init Docker Engine
@@ -322,6 +322,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
             self.cboBaseImage.addItem(filename, os.path.join(self.dockerfile_dir, f))
 
         self.building_log_file = os.path.join(self.base_dir, 'building.log')
+        self.LoadBiocPakageList()
 
 
     @pyqtSlot()
@@ -347,45 +348,39 @@ class UIDockerBuilder(QtWidgets.QWidget):
         else:
             with open(filename, 'r') as f:
                 doc.setPlainText(f.read())
-        doc.setDefaultFont(QFont(self.defaultFont))
+        doc.setDefaultFont(self.fontDockerfileEditor)
         doc.highlighter = DockerSyntaxHighlighter(doc)
         #doc.modificationChanged[bool].connect(self.onModificationChanged)
         doc.setModified(False)
         self._cachedDocument = doc
         self.txtDockerfile.setDocument(doc)
 
-        # parser bioc package list from docker file
-        # self.SelectedBiocPackage = []
-        # rawText = doc.toPlainText()
-        # self.model_package.clear()
-        #
-        # if rawText.find("biocLite(") >= 0:
-        #     packages = rawText.split("biocLite(")[1].split("\n")[0].split(")")[0]
-        #     if packages.find("c(") >= 0:
-        #         packages = packages.split("c(")[1]
-        #
-        #     l = ast.literal_eval(packages)
-        #     self.SelectedBiocPackage = [i.strip() for i in l]
-        #     #print (self.SelectedBiocPackage)
         return self._cachedDocument
 
-    @pyqtSlot()
-    def OnGetPakageListClicked(self):
-        service_getpackage = BiocPackageList()
-        packageList = service_getpackage.GetList()
+    def LoadBiocPakageList(self):
+        # loading
+        item = QStandardItem(" >>> Loading bioconductor package list <<< ")
+        self.model_package.appendRow(item)
+        self.lstPackages.setModel(self.package_list_proxy)
+        self.lstPackages.resizeColumnsToContents()
 
-        for pkg in packageList:
+        self.loadpackage_thread = BiocPackageList()
+        self.loadpackage_thread.load_completed.connect(self.ThreadEvent_OnLoadBiocPackageCompleted)
+        self.loadpackage_thread.start()
+
+
+    def ThreadEvent_OnLoadBiocPackageCompleted(self, packagelist):
+        self.model_package.removeRows(0, self.model_package.rowCount())
+        for pkg in packagelist:
             itemName = QStandardItem(pkg['Name'])
             itemName.setCheckable(True)
-            #if itemName in self.SelectedBiocPackage:
-            #    itemName.setCheckState(Qt.Checked)
             itemTitle = QStandardItem(pkg['Title'])
             self.model_package.appendRow([itemName, itemTitle])
 
         # Apply the model to the list view
         self.lstPackages.setModel(self.package_list_proxy)
-        self.lstPackages.resizeColumnsToContents()
-
+        self.lstPackages.resizeColumnToContents(0)
+        self.lstPackages.setColumnWidth(1, 130)
 
     @pyqtSlot(str)
     def OnPackageNameChanged(self, text):
@@ -457,7 +452,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(
             self, 'Save Dockerfile',
             filename,
-            'Docker files (*.*)'
+            'Docker files (*)'
         )
 
         if filename:
@@ -493,7 +488,6 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.edtPackageName.setEnabled(enabled)
         self.btnOpen.setEnabled(enabled)
         self.btnSave.setEnabled(enabled)
-        self.btnGetPackageList.setEnabled(enabled)
         self.btnBuild.setEnabled(self.dockerInitialized and enabled)
         self.cboBaseImage.setEnabled(enabled)
 
@@ -586,13 +580,19 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.pbrBuildPrgoress.setVisible(False)
 
 
-import requests, json
-class BiocPackageList:
+
+class BiocPackageList(QThread):
+    load_completed = pyqtSignal(object)
     #fetch_url = "http://bioconductor.org/packages/release/BiocViews.html#___Software"
     package_json_url = "http://bioconductor.org/packages/json/3.5/bioc/packages.js"
-    #{"Name": "a4", "Title": "Automated Affymetrix Array Analysis Umbrella Package"}
 
-    def GetList(self):
+    def __init__(self):
+        QThread.__init__(self)
+
+    def __del__(self):
+        self.wait()
+
+    def run(self):
         package_list = []
         try:
             rawhtml = requests.get(self.package_json_url)
@@ -603,7 +603,8 @@ class BiocPackageList:
         except:
             pass
 
-        return package_list
+        self.load_completed.emit(package_list)
+
 
 def main(argv=sys.argv):
 
