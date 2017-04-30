@@ -21,6 +21,6 @@ RUN cd R-* && make prefix=/ install
 #need to install in xxx for libraries to be in the right place
 
 #install components of bioconductor for networkBMA
-RUN Rscript -e "source('https://bioconductor.org/biocLite.R');biocLite(c('stats','utils','BMA','Rcpp','RcppArmadillo','RcppEigen','BH','leaps'),ask=FALSE)"
+RUN Rscript -e "source('https://bioconductor.org/biocLite.R');biocLite(c('BMA','Rcpp','RcppArmadillo','RcppEigen','BH','leaps'),ask=FALSE)"
 
 CMD ["/bin/bash"]
