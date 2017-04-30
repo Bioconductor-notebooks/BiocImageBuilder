@@ -18,7 +18,7 @@
   python3 BiocImageBuilderMain.py
 
 - macOs precompiled package
-  download docker-image-builder-app-macOS.zip from Release tab
+  download docker-image-builder-app-macOS.zip from [Release](https://github.com/JMHOO/BiocImageBuilder/releases/tag/v0.1) tab
 
   If you encountered 'Docker Credential' error during the building, please follow:
-  https://github.com/docker/docker-credential-helpers
+  [docker-credential-helpers](https://github.com/docker/docker-credential-helpers)
