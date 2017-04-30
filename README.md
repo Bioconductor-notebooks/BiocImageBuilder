@@ -1,3 +1,4 @@
+![](media/logo.png)
 # Bioconductor docker image builder
 
 ## Requirements
