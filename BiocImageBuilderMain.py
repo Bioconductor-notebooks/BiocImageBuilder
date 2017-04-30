@@ -27,9 +27,17 @@ class UIDockerBuilder(QtWidgets.QWidget):
             QFrame#frameTitle {background: #1588c5;color: #1588c5}
             QFrame#frameSubtitle {background: #1998de; }
             QFrame#framePackages{border: 1px solid #1588c5;border-radius: 2px;}
+            QFrame#frameSearchName {background: #1998de; }
             QLabel#lblInfoTitle{ 
                 background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:0, y2:1, stop:0 #1998de, stop:1 #1588c5);
-                padding-left: 3px;color: white;border-radius: 1px;
+                padding-left: 3px;color: white;
+            }
+            QLineEdit#edtPackageName{
+                background-image: url(icons/search_icon.png);
+                background-repeat: no-repeat;
+                background-position: left;
+                border: 1px solid #1a8ac6; border-radius: 10px;
+                padding: 2 2 2 20;
             }
         '''
         # GUI
@@ -192,7 +200,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.vlayout_content.addLayout(self.hlayout_buttons)
         # Right bioconductor packages aera
         self.vlayout_packages = QtWidgets.QVBoxLayout()
-        self.vlayout_packages.setSpacing(1)
+        self.vlayout_packages.setSpacing(0)
         self.vlayout_packages.setObjectName("vlayout_packages")
         self.vlayout_packages.setContentsMargins(0, 0, 0, 0)
         self.lblInfoTitle = QtWidgets.QLabel(self.mainContent)
@@ -200,17 +208,24 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.lblInfoTitle.setMaximumSize(QtCore.QSize(16777215, 30))
         self.lblInfoTitle.setObjectName("lblInfoTitle")
         self.vlayout_packages.addWidget(self.lblInfoTitle)
+
+        self.frameSearchName = QtWidgets.QFrame()
+        self.frameSearchName.setContentsMargins(5, 5, 2, 5)
+        self.frameSearchName.setObjectName("frameSearchName")
+        self.frameSearchName.setMinimumHeight(35)
+        self.frameSearchName.setMaximumHeight(35)
         self.hlayout_list_search = QtWidgets.QHBoxLayout()
         self.hlayout_list_search.setObjectName("hlayout_list_search")
-        self.hlayout_list_search.setContentsMargins(1, 0, 0, 1)
+        self.hlayout_list_search.setContentsMargins(1, 0, 0, 2)
         self.edtPackageName = QtWidgets.QLineEdit(self.mainContent)
         self.edtPackageName.setClearButtonEnabled(True)
         self.edtPackageName.setObjectName("edtPackageName")
         self.edtPackageName.setPlaceholderText("Search package")
-        self.edtPackageName.setMinimumSize(QtCore.QSize(0, 25))
-        self.edtPackageName.setMaximumSize(QtCore.QSize(16777215, 25))
+        self.edtPackageName.setMinimumHeight(25)
+        self.edtPackageName.setMaximumHeight(25)
         self.hlayout_list_search.addWidget(self.edtPackageName)
-        self.vlayout_packages.addLayout(self.hlayout_list_search)
+        self.frameSearchName.setLayout(self.hlayout_list_search)
+        self.vlayout_packages.addWidget(self.frameSearchName)
         self.lstPackages = QtWidgets.QTableView(self.mainContent)
         self.lstPackages.setObjectName("lstPackages")
         self.lstPackages.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
@@ -584,7 +599,10 @@ class UIDockerBuilder(QtWidgets.QWidget):
 class BiocPackageList(QThread):
     load_completed = pyqtSignal(object)
     #fetch_url = "http://bioconductor.org/packages/release/BiocViews.html#___Software"
-    package_json_url = "http://bioconductor.org/packages/json/3.5/bioc/packages.js"
+    package_json_url = [
+        "https://bioconductor.org/packages/json/3.5/bioc/packages.js",
+        "https://bioconductor.org/packages/json/3.5/data/experiment/packages.js"
+    ]
 
     def __init__(self):
         QThread.__init__(self)
@@ -595,13 +613,16 @@ class BiocPackageList(QThread):
     def run(self):
         package_list = []
         try:
-            rawhtml = requests.get(self.package_json_url)
-            jsonValue = '{%s}' % (rawhtml.text.split('{', 1)[1].rsplit('}', 1)[0],)
-            packages = json.loads(jsonValue)
-            for item in packages['content']:
-                package_list.append({"Name": item[0], "Title": item[2]})
-        except:
-            pass
+            for url in self.package_json_url:
+                rawhtml = requests.get(url)
+                jsonValue = '{%s}' % (rawhtml.text.split('{', 1)[1].rsplit('}', 1)[0],)
+                packages = json.loads(jsonValue)
+                for item in packages['content']:
+                    package_list.append({"Name": item[0], "Title": item[2]})
+        except Exception as e:
+            print (str(e))
+
+        package_list = sorted(package_list, key=lambda x: x['Name'].lower())
 
         self.load_completed.emit(package_list)
 
