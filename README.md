@@ -31,3 +31,10 @@
 
 ## Embed your own Dockerfiles
   Put your Dockerfiles into [DockerFiles] directory and rename your Dockerfile to **_<title>.Dockerfile_**
+  
+  
+  On macOS
+  ![Screenshot](media/screenshot.png)
+ 
+  On Ubuntu
+  ![Screenshot](media/screenshot_ubuntu.png)
