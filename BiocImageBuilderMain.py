@@ -315,7 +315,10 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.dockerClient = None
         strDockerInfo = ""
         try:
-            self.dockerClient = DockerClient('unix:///var/run/docker.sock', 'local')
+            if sys.platform == "win32":
+                self.dockerClient = DockerClient('tcp://127.0.0.1:2375', 'local')
+            else:
+                self.dockerClient = DockerClient('unix:///var/run/docker.sock', 'local')
             strDockerInfo = self.lblDockerVersion.text().format(self.dockerClient.version()['Version'])
             self.dockerInitialized = True
         except:
