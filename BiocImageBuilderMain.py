@@ -538,8 +538,10 @@ class UIDockerBuilder(QtWidgets.QWidget):
             endOfBuiding = progress[0] == progress[1]
 
         successful = message.find("Successfully built") >= 0
+        # errorDetail={'code': 2, 'message': "The command '/bin/sh -c pip3 install -r orange3/requirements-core.txt' returned a non-zero code: 2"}, error="The command '/bin/sh -c pip3 install -r orange3/requirements-core.txt' returned a non-zero code: 2"
+        failure = message.find("errorDetail=") >= 0 and message.find("error=") >= 0
 
-        if endOfBuiding or successful:
+        if endOfBuiding or successful or failure:
             self._set_building_text(self.lblBuidingStep, '')
             self._enableUIElements(True)
             self.pbrBuildPrgoress.setVisible(False)
