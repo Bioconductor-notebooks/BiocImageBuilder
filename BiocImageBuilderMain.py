@@ -1,4 +1,4 @@
-import sys, os, fnmatch
+import sys, os, fnmatch, tempfile
 import re
 import requests, json
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -537,14 +537,20 @@ class UIDockerBuilder(QtWidgets.QWidget):
 
             endOfBuiding = progress[0] == progress[1]
 
-        successful = message.find("Successfully built") >= 0
+
+        successful = re.search(r'Successfully built ([0-9a-f]+)', message)
+
         # errorDetail={'code': 2, 'message': "The command '/bin/sh -c pip3 install -r orange3/requirements-core.txt' returned a non-zero code: 2"}, error="The command '/bin/sh -c pip3 install -r orange3/requirements-core.txt' returned a non-zero code: 2"
         failure = message.find("errorDetail=") >= 0 and message.find("error=") >= 0
 
         if endOfBuiding or successful or failure:
-            self._set_building_text(self.lblBuidingStep, '')
+            if not failure: self._set_building_text(self.lblBuidingStep, '')
             self._enableUIElements(True)
             self.pbrBuildPrgoress.setVisible(False)
+            if self.dockerfile_for_build:
+                if sys.platform != 'win32': os.unlink(self.dockerfile_for_build)
+                else: os.remove(self.dockerfile_for_build)
+                self.dockerfile_for_build = ''
 
     @pyqtSlot()
     def OnBuildClicked(self):
@@ -552,7 +558,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         if not imagename:
             msg = QtWidgets.QMessageBox()
             msg.setText('No Image Name')
-            msg.setInformativeText("No Image Name\n\nPlease specify a image name")
+            msg.setInformativeText("Please specify a image name")
             msg.setIcon(QtWidgets.QMessageBox.Warning)
             msg.exec()
             self.edtImageName.setFocus()
@@ -562,7 +568,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         pattern = re.compile("^(?:(?=[^:\/]{1,253})(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(?:\.(?!-)[a-zA-Z0-9-]{1,63}(?<!-))*(?::[0-9]{1,5})?/)?((?![._-])(?:[a-z0-9._-]*)(?<![._-])(?:/(?![._-])[a-z0-9._-]*(?<![._-]))*)(?::(?![.-])[a-zA-Z0-9_.-]{1,128})?$")
         if not pattern.search(imagename):
             msg = QtWidgets.QMessageBox()
-            msg.setText('Image Name Invalid')
+            msg.setText('Invalid image name')
             msg.setInformativeText("Typical image name:\n    registry/image-name[:version] \n\n"
                         "For example: \n    biodepot/bwb:latest")
             msg.setIcon(QtWidgets.QMessageBox.Warning)
@@ -570,13 +576,41 @@ class UIDockerBuilder(QtWidgets.QWidget):
             self.edtImageName.setFocus()
             return
 
+        dockerfile = self.txtDockerfile.toPlainText()
+
+        # skip empty docker file
+        if not dockerfile.strip():
+            self._set_building_text(self.lblBuiding, 'Error: empty Docker file')
+            return
+
         self._enableUIElements(False)
         self.pbrBuildPrgoress.setVisible(True)
-        dockerfile = self.txtDockerfile.toPlainText()
+
+        buildpath = self.cboBaseImage.currentData()
+        if buildpath == "-SCRATCH-":
+            buildpath = self.base_dir
+        else:
+            buildpath = os.path.dirname(buildpath)
+            if buildpath == self.dockerfile_dir:
+                buildpath = self.base_dir
+
+        # create a temp shadow dockerfile for building
+        shadow_dockerfile = ''
+        if sys.platform == 'win32':
+            shadow_dockerfile = 'Dockerfile.build.tmp'
+            self.dockerfile_for_build = os.path.join(buildpath, 'Dockerfile.build.tmp')
+            with open(self.dockerfile_for_build, 'wb') as fp:
+                fp.write(dockerfile.encode('utf-8'))
+        else:
+            fp = tempfile.NamedTemporaryFile(delete=False)
+            fp.write(dockerfile.encode('utf-8'))
+            fp.close()
+            self.dockerfile_for_build = fp.name
+            shadow_dockerfile = fp.name
 
         self._set_building_text(self.lblBuidingStep, "Start building")
         # Call docker API to build image using thread
-        self.buildimage_thread = DockerThread_BuildImage(self.dockerClient, imagename, dockerfile)
+        self.buildimage_thread = DockerThread_BuildImage(self.dockerClient, imagename, buildpath, shadow_dockerfile)
         self.buildimage_thread.build_process.connect(self.ThreadEvent_OnImageBuilding)
         self.buildimage_thread.build_complete.connect(self.ThreadEvent_OnImageBuildComplete)
         self.buildimage_thread.start()
