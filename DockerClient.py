@@ -1,13 +1,16 @@
 import docker
 import requests, json
-import io
+import io, sys
 from PyQt5.QtCore import QThread, pyqtSignal
 
 class DockerClient:
     def __init__(self, url, name):
         self.url = url
         self.name = name
-        self.cli = docker.APIClient(base_url=url)
+        if sys.platform == "win32":
+            self.cli = docker.from_env()
+        else:
+            self.cli = docker.APIClient(base_url=url)
 
     def getClient(self):
         return self.cli
