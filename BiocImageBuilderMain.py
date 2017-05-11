@@ -168,9 +168,22 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.btnSelectScriptFile.setObjectName("btnSelectScriptFile")
         self.hlayout_RScript.addWidget(self.btnSelectScriptFile)
         self.vlayout_content.addLayout(self.hlayout_RScript)
+
+        self.hlayout_dockertitle = QtWidgets.QHBoxLayout()
+        self.hlayout_dockertitle.setObjectName("hlayout_dockertitle")
+        self.hlayout_dockertitle.setContentsMargins(0, -1, -1, -1)
+        self.hlayout_dockertitle.setSpacing(1)
+
         self.lblDockerfile = QtWidgets.QLabel(self.mainContent)
         self.lblDockerfile.setObjectName("lblDockerfile")
-        self.vlayout_content.addWidget(self.lblDockerfile)
+        self.chkBinderCompatible = QtWidgets.QCheckBox()
+
+        self.hlayout_dockertitle.addWidget(self.lblDockerfile)
+        self.hlayout_dockertitle.addItem(
+            QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum))
+        self.hlayout_dockertitle.addWidget(self.chkBinderCompatible)
+        self.vlayout_content.addLayout(self.hlayout_dockertitle)
+        #self.vlayout_content.addWidget(self.lblDockerfile)
         self.txtDockerfile = QtWidgets.QPlainTextEdit(self.mainContent)
         self.txtDockerfile.setObjectName("txtDockerfile")
         #self.txtDockerfile.setLineWrapMode(QtWidgets.QTextEdit.NoWrap)      ### text wrap
@@ -308,6 +321,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.btnSave.setText(_translate("Form", "Save"))
         self.btnBuild.setText(_translate("Form", "Build"))
         self.lblInfoTitle.setText(_translate("Form", "Bioconductor R packages"))
+        self.chkBinderCompatible.setText(_translate("Form", "Binder Compatible"))
 
     def InitializeUI(self):
         # Init Docker Engine
@@ -417,6 +431,9 @@ class UIDockerBuilder(QtWidgets.QWidget):
 
     def _update_bioc_package_in_dockerfile(self, previous_package):
         base_bioclite = "RUN Rscript -e \"source('https://bioconductor.org/biocLite.R');biocLite(c({0}),ask=FALSE)\"\n"
+        if self.chkBinderCompatible.isChecked():
+            base_bioclite = "RUN echo \"source('http://bioconductor.org/biocLite.R'); biocLite(c({0}))\" | R --vanilla\n"
+
         previous = ','.join("'{0}'".format(w) for w in previous_package)
         current = ','.join("'{0}'".format(w) for w in self.SelectedBiocPackage)
 
@@ -438,6 +455,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         else:
             # try locate "CMD"
             matched_cmd = self._find_bioclite("CMD", plainText)
+            if not matched_cmd: matched_cmd = self._find_bioclite("WORKDIR", plainText)
             if matched_cmd:
                 self._move_editor_cursor(matched_cmd.start(), matched_cmd.end())
                 cursor = self.txtDockerfile.textCursor()
@@ -445,6 +463,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
                 self.txtDockerfile.setTextCursor(cursor)
             else:
                 self.txtDockerfile.moveCursor(QtGui.QTextCursor.End)
+                base_bioclite = "\n" + base_bioclite
 
         cursor = self.txtDockerfile.textCursor()
         if matched and cursor.hasSelection():
