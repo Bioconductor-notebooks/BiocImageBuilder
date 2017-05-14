@@ -17,6 +17,22 @@
   pip3 install docker
 ```
 ## How to run
+- Run through docker
+```
+docker run --rm -it -v ${PWD}:/root/files -p 6080:6080 biodepot/bioc-builder
+```
+OR if you want to use [Build] feature:
+```
+docker run --rm -it -v ${PWD}:/root/files -v /var/run/docker.sock:/var/run/docker.sock -p 6080:6080 biodepot/bioc-builder
+```
+Then point a browser to **_localhost:6080_** for systems that run Docker natively
+
+For windows and MacOS systems using VNs - find the the ip by
+docker-machine ip
+or
+ping docker.local
+and point the browser to <IP>:6080
+
 - Command line
 ```
   python3 BiocImageBuilderMain.py
