@@ -1,4 +1,5 @@
 # Customized using Jupyter Notebook R Stack https://github.com/jupyter/docker-stacks/tree/master/r-notebook
+# Binder Compatible
 FROM jupyter/r-notebook:599db13f9123
 
 MAINTAINER Reem Almugbel <reem2@uw.edu>
@@ -32,6 +33,8 @@ RUN conda install --quiet --yes \
     'r-nycflights13=0.2*' \
     'r-caret=6.0*' \
     'r-rcurl=1.95*' \
+    'r-xml=3.98_1.5' \
     'r-crayon=1.3*' && conda clean -tipsy
 
 WORKDIR /home/jovyan
+ADD . /home/jovyan
