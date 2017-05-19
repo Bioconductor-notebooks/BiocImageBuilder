@@ -14,6 +14,8 @@ class UIDockerBuilder(QtWidgets.QWidget):
 
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
         self.FLAG_in_bundle = False
+        self.FLAG_binder_string = '<BinderCompatible>'
+        self.FLAG_binder_compatible = False
         if getattr(sys, 'frozen', False):
             self.base_dir = sys._MEIPASS
             self.FLAG_in_bundle =True
@@ -176,12 +178,12 @@ class UIDockerBuilder(QtWidgets.QWidget):
 
         self.lblDockerfile = QtWidgets.QLabel(self.mainContent)
         self.lblDockerfile.setObjectName("lblDockerfile")
-        self.chkBinderCompatible = QtWidgets.QCheckBox()
+        #self.chkBinderCompatible = QtWidgets.QCheckBox()
 
         self.hlayout_dockertitle.addWidget(self.lblDockerfile)
         self.hlayout_dockertitle.addItem(
             QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum))
-        self.hlayout_dockertitle.addWidget(self.chkBinderCompatible)
+        #self.hlayout_dockertitle.addWidget(self.chkBinderCompatible)
         self.vlayout_content.addLayout(self.hlayout_dockertitle)
         #self.vlayout_content.addWidget(self.lblDockerfile)
         self.txtDockerfile = QtWidgets.QPlainTextEdit(self.mainContent)
@@ -321,7 +323,7 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.btnSave.setText(_translate("Form", "Save"))
         self.btnBuild.setText(_translate("Form", "Build"))
         self.lblInfoTitle.setText(_translate("Form", "Bioconductor R packages"))
-        self.chkBinderCompatible.setText(_translate("Form", "Binder Compatible"))
+        #self.chkBinderCompatible.setText(_translate("Form", "Binder Compatible"))
 
     def InitializeUI(self):
         # Init Docker Engine
@@ -387,6 +389,12 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self._cachedDocument = doc
         self.txtDockerfile.setDocument(doc)
 
+        plainText = self.txtDockerfile.toPlainText()
+        if self._find_bioclite(self.FLAG_binder_string, plainText):
+            self.FLAG_binder_compatible = True
+        else:
+            self.FLAG_binder_compatible = False
+
         return self._cachedDocument
 
     def LoadBiocPakageList(self):
@@ -431,7 +439,8 @@ class UIDockerBuilder(QtWidgets.QWidget):
 
     def _update_bioc_package_in_dockerfile(self, previous_package):
         base_bioclite = "RUN Rscript -e \"source('https://bioconductor.org/biocLite.R');biocLite(c({0}),ask=FALSE)\"\n"
-        if self.chkBinderCompatible.isChecked():
+        if self.FLAG_binder_compatible:
+        #if self.chkBinderCompatible.isChecked():
             base_bioclite = "RUN echo \"source('http://bioconductor.org/biocLite.R'); biocLite(c({0}))\" | R --vanilla\n"
 
         previous = ','.join("'{0}'".format(w) for w in previous_package)
