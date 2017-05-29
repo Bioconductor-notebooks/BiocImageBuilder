@@ -419,7 +419,8 @@ class UIDockerBuilder(QtWidgets.QWidget):
 
         # Apply the model to the list view
         self.lstPackages.setModel(self.package_list_proxy)
-        self.lstPackages.resizeColumnToContents(0)
+        #self.lstPackages.resizeColumnToContents(0)
+        self.lstPackages.setColumnWidth(0, 190)
         self.lstPackages.setColumnWidth(1, 130)
 
     @pyqtSlot(str)
@@ -662,14 +663,18 @@ class UIDockerBuilder(QtWidgets.QWidget):
         self.pbrBuildPrgoress.setVisible(False)
 
 
+from bs4 import BeautifulSoup
 
 class BiocPackageList(QThread):
     load_completed = pyqtSignal(object)
     #fetch_url = "http://bioconductor.org/packages/release/BiocViews.html#___Software"
     package_json_url = [
         "https://bioconductor.org/packages/json/3.5/bioc/packages.js",
-        "https://bioconductor.org/packages/json/3.5/data/experiment/packages.js"
+        "https://bioconductor.org/packages/json/3.5/data/experiment/packages.js",
+        "https://bioconductor.org/packages/json/3.5/data/annotation/packages.js"
     ]
+
+    cran_packages_url = "https://cran.r-project.org/web/packages/available_packages_by_name.html"
 
     def __init__(self):
         QThread.__init__(self)
@@ -679,6 +684,23 @@ class BiocPackageList(QThread):
 
     def run(self):
         package_list = []
+        # load package list from CRAN
+        try:
+            cranhtml = requests.get(self.cran_packages_url)
+            soup = BeautifulSoup(cranhtml.text, "html.parser")
+            for table in soup.findAll('table'):
+                for row in table.findAll('tr'):
+                    cells = row.findAll('td')
+                    if len(cells) == 2:
+                        links = cells[0].findAll("a")
+                        if len(links) > 0:
+                            name = links[0].contents[0]
+                        title = cells[1].string
+                        package_list.append({"Name": name, "Title": title})
+        except Exception as e:
+            print(str(e))
+
+        # load package list from bioconductor
         try:
             for url in self.package_json_url:
                 rawhtml = requests.get(url)
@@ -690,6 +712,7 @@ class BiocPackageList(QThread):
             print (str(e))
 
         package_list = sorted(package_list, key=lambda x: x['Name'].lower())
+        #print(len(package_list))
 
         self.load_completed.emit(package_list)
 
