@@ -16,6 +16,8 @@
 ```
   pip3 install docker
 ```
+
+
 ## How to run
 - Run through docker
 ```
@@ -45,9 +47,13 @@ and point the browser to <IP>:6080
   If you encountered 'Docker Credential' error during the building, please follow:
   [docker-credential-helpers](https://github.com/docker/docker-credential-helpers)
 
+
 ## Embed your own Dockerfiles
   Put your Dockerfiles into [DockerFiles] directory and rename your Dockerfile to **_<title>.Dockerfile_**
-  
+
+## Demo
+[![BiocImageBuilder tutorial](https://img.youtube.com/vi/HftUChnYytw/0.jpg)](https://www.youtube.com/watch?v=HftUChnYytw)
+ 
 
 ## Screenshots
   On macOS
