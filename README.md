@@ -41,7 +41,7 @@ and point the browser to <IP>:6080
 ```
 - macOs precompiled package
 
-  Download docker-image-builder-app-macOS.zip from [Release](https://github.com/JMHOO/BiocImageBuilder/releases/tag/v0.1) tab
+  Download docker-image-builder-app-macOS.zip from [Release](https://github.com/JMHOO/BiocImageBuilder/releases/tag/v0.4) tab
 
 
   If you encountered 'Docker Credential' error during the building, please follow:
