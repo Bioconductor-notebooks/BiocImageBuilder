@@ -1,5 +1,7 @@
 ![](media/logo.png)
 # Bioconductor docker image builder
+[![](https://images.microbadger.com/badges/image/biodepot/bioc-builder.svg)](https://microbadger.com/images/biodepot/bioc-builder "Get your own image badge on microbadger.com")
+[![](https://images.microbadger.com/badges/version/biodepot/bioc-builder.svg)](https://microbadger.com/images/biodepot/bioc-builder "Get your own version badge on microbadger.com")
 
 ## Requirements
 - python 3.5
