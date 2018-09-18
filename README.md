@@ -31,7 +31,7 @@ docker run --rm -it -v ${PWD}:/root/files -v /var/run/docker.sock:/var/run/docke
 ```
 Then point a browser to **_localhost:6080_** for systems that run Docker natively
 
-For windows and MacOS systems using VNs - find the the ip by
+For windows and MacOS systems using VNs - find the ip by
 docker-machine ip
 or
 ping docker.local
